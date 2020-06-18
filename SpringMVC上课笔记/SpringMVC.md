@@ -112,6 +112,35 @@ MVC： M（model,模型） V （view,视图） C （controller, 控制器）
 
   ![](./images/snipaste20200618_101809.png)
 
+### 关于DispacherServlet 路径的配置
+
+```Xml
+<servlet>
+  <servlet-name>dispatcher</servlet-name>
+  <!--
+            DispatcherServlet 是SpringMVC的核心
+        -->
+  <servlet-class>org.springframework.web.servlet.DispatcherServlet</servlet-class>
+  <!--
+            可以使用初始化参数指定 SpringMVC 核心配置文件的路径
+            如果没有指定SpringMVC核心配置文件的路径，则默认是在WEB-INF目录下去找
+            当前 <servlet-name> -servlet.xml文件作为SpringMVC的核心配置文件
+        -->
+  <init-param>
+    <param-name>contextConfigLocation</param-name>
+    <param-value>classpath:dispatcher-servlet.xml</param-value>
+  </init-param>
+  <!--
+            表示Servlet在web容器加载的时候就开始生效
+        -->
+  <load-on-startup>1</load-on-startup>
+</servlet>
+<servlet-mapping>
+  <servlet-name>dispatcher</servlet-name>
+  <url-pattern>/</url-pattern>
+</servlet-mapping>
+```
+
 
 
 ## HelloWorld原理
@@ -174,21 +203,21 @@ MVC： M（model,模型） V （view,视图） C （controller, 控制器）
   }
   ```
 
-  ## 统配符映射
+## 统配符映射
 
-  ```Java
-  /*
-  请求路径支持通配符映射
-              使用一个通配符路径映射请求到受理请求的方法
-              ? 表示匹配一个任意字符
-              * 表示匹配一层路径中的任意多个字符
-              ** 表示匹配多层路径中的任意字符
-  */
-  @RequestMapping("/**/testAnt?")
-  public String testAnt(){
-    return "success";
-  }
-  ```
+```Java
+/*
+请求路径支持通配符映射
+            使用一个通配符路径映射请求到受理请求的方法
+            ? 表示匹配一个任意字符
+            * 表示匹配一层路径中的任意多个字符
+            ** 表示匹配多层路径中的任意字符
+*/
+@RequestMapping("/**/testAnt?")
+public String testAnt(){
+  return "success";
+}
+```
 
-  ​	
+​	
 
