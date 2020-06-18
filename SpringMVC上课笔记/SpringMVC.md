@@ -118,3 +118,77 @@ MVC： M（model,模型） V （view,视图） C （controller, 控制器）
 
 ![](images/snipaste20200618_103209.png)
 
+## @RequestMapping
+
+- 可以修饰在方法处，也可以修饰在类定义处
+
+>  类定义处：提供初步的请求映射信息。相对于  WEB 应用的根目录–
+>
+> 方法处：提供进一步的细分映射信息。相对于类定义处的 URL。若– 类定义处未标注 @RequestMapping，则方法处标记的 URL 相对于 WEB 应用的根目录
+
+### 属性
+
+- value : 指请求的url, 根据请求的url确定请求受理的方法
+
+- method : 根据请求的方式确定请求受理的方法
+
+  ```Java
+  @RequestMapping(value = "/hello", method = {RequestMethod.POST})
+  public String hello(){
+    System.out.println("HelloWorld!");
+    return "success";
+  }
+  ```
+
+  注：如果请求方法不匹配会出现以下情况
+
+  ![](images/snipaste20200618_113023.png)
+
+  **以下两个属性作为了解。**
+
+- params : 根据请求携带的参数确定受理请求的方法
+
+  ```Java
+  /*
+  params属性
+              根据请求的参数确定请求受理的方法
+              params属性是一个字符串类型的数组，支持一些简单的表达式 !  =  !=
+  */
+  @RequestMapping(value = "/testParam", params = {"name!=zhangsan","age"})
+  public String testParam(){
+    return "success";
+  }
+  ```
+
+- headers : 根据请求头中携带的参数确定请求受理的方法
+
+  ```Java
+  /*
+  headers 属性
+              根据请求头中的参数确定请求受理的方法
+              headers 属性是一个字符串类型的数组，支持一些简单的表达式 !  =  !=
+  */
+  @RequestMapping(value = "/testHeaders",headers = {"Accept-Language=zh-CN,zh;q=0.9,en-US;q=0.8,en;q=0.7"})
+  public String testHeaders(){
+    return "success";
+  }
+  ```
+
+  ## 统配符映射
+
+  ```Java
+  /*
+  请求路径支持通配符映射
+              使用一个通配符路径映射请求到受理请求的方法
+              ? 表示匹配一个任意字符
+              * 表示匹配一层路径中的任意多个字符
+              ** 表示匹配多层路径中的任意字符
+  */
+  @RequestMapping("/**/testAnt?")
+  public String testAnt(){
+    return "success";
+  }
+  ```
+
+  ​	
+
