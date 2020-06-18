@@ -30,7 +30,7 @@ MVC： M（model,模型） V （view,视图） C （controller, 控制器）
 
 - 导入相关jar包（如果使用的是idea下载的方式，会自动下载到你自己的工程中，只需调整jar包位置即可）
 
-  ![images/snipaste20200618_095924.png](images/snipaste20200618_095924.png)
+  ![./images/snipaste20200618_095924.png](images/snipaste20200618_095924.png)
 
 - 需要编写配置文件
 
@@ -110,13 +110,13 @@ MVC： M（model,模型） V （view,视图） C （controller, 控制器）
 
 - 在WEB-INFO目录下创建一个success.jsp
 
-  ![](images/snipaste20200618_101809.png)
+  ![](./images/snipaste20200618_101809.png)
 
 
 
 ## HelloWorld原理
 
-![](images/snipaste20200618_103209.png)
+![](./images/snipaste20200618_103209.png)
 
 ## @RequestMapping
 
@@ -142,7 +142,7 @@ MVC： M（model,模型） V （view,视图） C （controller, 控制器）
 
   注：如果请求方法不匹配会出现以下情况
 
-  ![](images/snipaste20200618_113023.png)
+  ![](./images/snipaste20200618_113023.png)
 
   **以下两个属性作为了解。**
 
