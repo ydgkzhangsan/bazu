@@ -219,5 +219,226 @@ public String testAnt(){
 }
 ```
 
-​	
+## @PathVariable 注解
+
+>```
+>@PathVariable 的使用
+>    如果需要映射路径中的参数，
+>    首先需要使用占位符将参数取名, 例如 {占位名}
+>    其次需要在目标受理请求的入参中使用@PathVariable注解将参数绑定给方法入参
+>```
+
+```html
+<body>
+    <a href="/testPathVariable/2">Test PathVariable</a>
+  </body>
+```
+
+```java
+@RequestMapping("/testPathVariable/{id}")
+public String testPathVariable(@PathVariable("id") Integer id){
+  System.out.println("从路径中获取的参数为:" + id);
+  return "success";
+}
+```
+
+## Rest 请求
+
+>  HTTP 协议里面，四个表示操作方式的动词：GET、POST、PUT、DELETE。它们分别对应四种基本操作：GET 用来获取资源，POST 用来新建资源，PUT 用来更新资源，DELETE 用来删除资源
+
+### 发送 PUT 及 DELETE 请求
+
+- 配置好 HiddentHttpMethodFilter 过滤器
+
+  ```xml
+  <!--
+          配置 HiddenHttpMethodFilter
+              用于将浏览器发送的 POST 请求转换为 PUT 及 DELETE 请求
+      -->
+  <filter>
+    <filter-name>HiddenHttpMethodFilter</filter-name>
+    <filter-class>org.springframework.web.filter.HiddenHttpMethodFilter</filter-class>
+  </filter>
+  <filter-mapping>
+    <filter-name>HiddenHttpMethodFilter</filter-name>
+    <url-pattern>/*</url-pattern>
+  </filter-mapping>
+  ```
+
+- 需要发送一个 POST 请求
+
+- 需要在 POST 请求中携带一个请求参数 _method 值是 PUT 或 DELETE
+
+  ```HTML
+  Delete 请求: <form method="post" action="/testRest">
+    <input type="hidden" name="_method" value="DELETE" />
+    <input type="submit" value="Test DELETE">
+  </form>
+  <hr>
+  Put 请求：<form method="post" action="/testRest">
+    <input type="hidden" name="_method" value="PUT" />
+    <input type="submit" value="Test Put">
+  </form>
+  ```
+
+## 获取请求参数
+
+使用@RequestParam注解作为目标方法的入参，用于获取请求中的参数
+
+属性：
+
+- value 请求中参数的名称 
+
+  注： 如果，请求中的参数和目标方法的入参名一致，可以省略@RequestParam注解
+
+- required 表示参数是否是必须的
+
+- defaultValue 参数的默认值
+
+  **出现以下异常的原因为，没有传递相应的参数**
+
+![](images/snipaste20200618_152814.png)
+
+
+
+## @RequestHeader
+
+获取请求报文中的参数。使用方式同@RequestParam
+
+```Java
+@RequestMapping("/testRequestHeader")
+public String testRequestHeader(@RequestHeader("Accept-Language") String lg,
+                                @RequestHeader("Cookie") String cookie){
+  System.out.println("lg = " + lg);
+  System.out.println("cookie = " + cookie);
+  return "success";
+}
+```
+
+## @CookieValue
+
+获取Cookie中的数据， 使用方式同@RequestParam
+
+```Java
+@RequestMapping("/testCookieValue")
+public String testCookieValue(@CookieValue("JSESSIONID") String jid){
+  System.out.println("jid = " + jid);
+  return "success";
+}
+```
+
+## 使用普通的Java类作为入参
+
+> 可以使用普通的java类作为方法的入参。会将请求参数中和Java类属性名称相同的参数赋值为对应的属性
+
+```Java
+@RequestMapping("/testPojo")
+public String testPojo(Person person){
+  System.out.println("person = " + person);
+  return "success";
+}
+```
+
+前台表单：![](images/snipaste20200618_155646.png)
+
+打印结果：![](images/snipaste20200618_155735.png)
+
+## 使用原生的ServletAPI
+
+可以在目标受理请求的方法入参中加入原生的ServletAPI作为入参，即可使用原生ServletAPI
+
+支持的ServletAPI有
+
+- HttpServletRequest
+- HttpServletResponse
+- HttpSession
+- java.security.Principal
+-  Locale• InputStream
+- OutputStream
+-  Reader
+-  Writer
+
+### 原理：
+
+在调用目标受理请求方法时，SpringMVC会判断参数中是否有指定原生ServletAPI类型的参数，如果有，就传入给目标方法，所以目标方法即可使用了
+
+```Java
+if (!ServletRequest.class.isAssignableFrom(parameterType) && !MultipartRequest.class.isAssignableFrom(parameterType)) {
+  if (ServletResponse.class.isAssignableFrom(parameterType)) {
+    this.responseArgumentUsed = true;
+    nativeResponse = webRequest.getNativeResponse(parameterType);
+    if (nativeResponse == null) {
+      throw new IllegalStateException("Current response is not of type [" + parameterType.getName() + "]: " + response);
+    } else {
+      return nativeResponse;
+    }
+  } else if (HttpSession.class.isAssignableFrom(parameterType)) {
+    return request.getSession();
+  } else if (Principal.class.isAssignableFrom(parameterType)) {
+    return request.getUserPrincipal();
+  } else if (Locale.class == parameterType) {
+    return RequestContextUtils.getLocale(request);
+  } else if (InputStream.class.isAssignableFrom(parameterType)) {
+    return request.getInputStream();
+  } else if (Reader.class.isAssignableFrom(parameterType)) {
+    return request.getReader();
+  } else if (OutputStream.class.isAssignableFrom(parameterType)) {
+    this.responseArgumentUsed = true;
+    return response.getOutputStream();
+  } else if (Writer.class.isAssignableFrom(parameterType)) {
+    this.responseArgumentUsed = true;
+    return response.getWriter();
+  } else {
+    return super.resolveStandardArgument(parameterType, webRequest);
+  }
+```
+
+snipaste20200618_165323.png
+
+## 处理模型数据
+
+### 处理模型数据之一
+
+使用ModelAndView作为受理请求方法的返回值
+
+```Java
+/*
+    处理模型数据之一：
+        使用 ModelAndView 作为目标受理请求方法的返回值时，可以向ModelAndView中添加模型数据，
+    添加的模型数据会自动的输出到Request域对象中
+     */
+@RequestMapping("/testModelAndView")
+public ModelAndView testModelAndView(){
+  ModelAndView model = new ModelAndView("success");
+  model.addObject("school","yuandagaoke");
+  return model;
+}
+```
+
+### 处理模型数据之二
+
+使用 Map、HashMap、 LindedHashMap、ModeMap、ExtendedModeMap、Model作为方法入参
+
+```Java
+ /*
+    处理模型数据之二：
+       使用 Map 或 Model 作为目标方法的入参  非常重要
+
+       因为SpringMVC为我们传入的参数为 BindingAwareModeMap
+       所以可以使用它的父类接受这个参数，HashMap LindedHashMap、ModeMap、
+       ExtendedModeMap都可以作为受理请求方法入参来处理模型数据
+     */
+@RequestMapping("/testModel")
+public String testModel(Model model){
+  model.addAttribute("school","ydgk");
+
+  return "success";
+}
+```
+
+
+
+
+
+
 
