@@ -153,7 +153,7 @@ MVC： M（model,模型） V （view,视图） C （controller, 控制器）
 
 >  类定义处：提供初步的请求映射信息。相对于  WEB 应用的根目录–
 >
-> 方法处：提供进一步的细分映射信息。相对于类定义处的 URL。若– 类定义处未标注 @RequestMapping，则方法处标记的 URL 相对于 WEB 应用的根目录
+>  方法处：提供进一步的细分映射信息。相对于类定义处的 URL。若– 类定义处未标注 @RequestMapping，则方法处标记的 URL 相对于 WEB 应用的根目录
 
 ### 属性
 
@@ -353,10 +353,10 @@ public String testPojo(Person person){
 - HttpServletResponse
 - HttpSession
 - java.security.Principal
--  Locale• InputStream
+- Locale• InputStream
 - OutputStream
--  Reader
--  Writer
+- Reader
+- Writer
 
 ### 原理：
 
@@ -417,7 +417,7 @@ public ModelAndView testModelAndView(){
 
 ### 处理模型数据之二
 
-使用 Map、HashMap、 LindedHashMap、ModeMap、ExtendedModeMap、Model作为方法入参
+使用 **Map**、HashMap、 LindedHashMap、ModeMap、ExtendedModeMap、Model作为方法入参
 
 ```Java
  /*
@@ -435,6 +435,139 @@ public String testModel(Model model){
   return "success";
 }
 ```
+
+### 处理模型数据之三
+
+**使用 @SessionAttributes 注解将模型中的数据暂存到 HttpSession 中**
+
+```Java
+@Controller
+/*
+    @SessionAttributes 注解可以将模型中的数据暂存到 HttpSession 中
+        value 属性是根据模型中数据的键名称暂存的
+        types 属性模型中数据的类型暂存
+ */
+@SessionAttributes(value = {"user"}, types = {String.class})
+public class DispatcherController {
+
+    @RequestMapping("/testSessionAttribute")
+    public String testSessionAttribute(Map map){
+        map.put("user",new User(1,"zhangsan","zhangsan@qq.com",18));
+        map.put("school", "ydgk");
+        return "success";
+    }
+}
+```
+
+
+
+### 处理模型数据之四
+
+使用 @ModelAttribute 注解
+
+- **在方法定义上使用 @ModelAttribute 注解：Spring MVC在调用目标处理方法前，会先逐个调用在方法级上标注了 @ModelAttribute 的方法。** 
+
+
+- 在方法的入参前使用 @ModelAttribute 注解：
+  - 可以从隐含对象中获取隐含的模型数据中获取对象，再将请求参数
+  - 绑定到对象中，再传入入参 将方法入参对象添加到模型中
+
+```Java
+/*
+    @ModelAttribute 注解可以修饰方法
+        修饰方法时，会在任何目标受理请求方法调用之前调用
+        在 ModelAttribute注 解修饰的方法中可以向模型中存入数据，
+        存入的数据可能会作为前台数据存入的模板
+
+    注意： SpringMVC 在调用受理请求方法之前会在模型中取出参数类型首字母小写的数据，作为方法的入参。
+
+    总结ModelAttribute注解作用流程：
+        1、从数据库中取出 User , 将 User 存入模型对象中
+        2、SpringMVC 一定在某个时刻将模型中的数据取出，作为接收前台表单中传入的值。
+        3、SpringMVC将模型中的 user 作为方法的入参
+     */
+@ModelAttribute
+public void getUser(@RequestParam("id") Integer id,
+                    Map map){
+  System.out.println("DispatcherController.getUser");
+  if(id != null){
+    //从数据库中取出对应的对象    并将对象存入模型中
+    map.put("user",new User(1,"zhangsan","zhangsan@qq.com",18));
+  }
+}
+
+@RequestMapping("/testModelAttribute")
+public String testModelAttribute(User user){
+  System.out.println("修改User为："+ user);
+  return "success";
+}
+```
+
+### 由@SessionAttributes 注解引发的异常
+
+如果目标受理请求的方法入参是一个POJO时，SpringMVC会先自动从模型中取出POJO类型首字母小写的模型数据使用，如果模型中不存在对应的数据，则会判断受理请求方法所在类是否被@SessionAttributes 注解修饰，如果修饰了，就会从HttpSession取出POJO类型首字母小写的键对应的值，如果取不到，就会报以下异常。
+
+![](images/snipaste20200619_102208.png)
+
+## ModelAttribute注解源码解析
+
+```Java
+private WebDataBinder resolveModelAttribute(String attrName, MethodParameter methodParam, ExtendedModelMap implicitModel, NativeWebRequest webRequest, Object handler) throws Exception {
+  		// 将方法传入的 attrName 赋值给name, 传入的 attrName 是由入参是否被 @ModelAttribute 注解的value属性决定
+        String name = attrName;
+  		// 如果参数没有被@ModelAttribute注解修饰
+        if ("".equals(attrName)) {
+          // 会根据参数类型的首字母小写确定 name
+            name = Conventions.getVariableNameForParameter(methodParam);
+        }
+
+        Class<?> paramType = methodParam.getParameterType();
+        Object bindObject;
+  		// 判断模型中是否存在 name 对应的数据
+        if (implicitModel.containsKey(name)) {
+          	// 如果存在
+            bindObject = implicitModel.get(name);
+          // 如果不存在，继续判断受理请求方法所在类是否被@SessionAttributes注解修饰
+        } else if (this.methodResolver.isSessionAttribute(name, paramType)) {
+          // 如果被修饰了... SpringMvc会尝试从HttpSession中获取name对应的数据给到bindObject
+            bindObject = this.sessionAttributeStore.retrieveAttribute(webRequest, name);
+            if (bindObject == null) {
+              // 如果在Session中依然没有取出对应的值，则抛出异常
+                this.raiseSessionRequiredException("Session attribute '" + name + "' required - not found in session");
+            }
+          // 如果在模型中没有name对应的数据，并且方法所在类也没有被@SessionAttributes注解修饰
+        } else {
+          	// 直接通过反射创建新的实例作为创建WebDataBinder的参考
+            bindObject = BeanUtils.instantiateClass(paramType);
+        }
+		// 通过确定bindObject 和 name 创建 webDataBinder  前台表单中传入的数据都是通过数据绑定器绑定的。
+        WebDataBinder binder = this.createBinder(webRequest, bindObject, name);
+        this.initBinder(handler, name, binder, webRequest);
+        return binder;
+    }
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
