@@ -547,6 +547,138 @@ private WebDataBinder resolveModelAttribute(String attrName, MethodParameter met
     }
 ```
 
+## 视图解析器
+
+### 视图解析器的工作示意图
+
+![](images/snipaste20200619_141413.png)
+
+
+
+- 请求处理方法执行完成后，最终返回一个 ModelAndView 对象。对于那些返回 String，View 或 ModeMap 等类型的处理方法，**Spring MVC 也会在内部将它们装配成一个 ModelAndView 对象**，它包含了<u>逻辑名和模型对象的视图</u> 
+- Spring MVC 借助视图解析器（ViewResolver）得到最终的视图对象（View），最终的视图可以是 JSP ，也可能是 Excel、JFreeChart  等各种表现形式的视图 
+- 对于最终究竟采取何种视图对象对模型数据进行渲染，处理器并不关心，处理器工作重点聚焦在生产模型数据的工作上，从而实现 MVC 的充分解耦
+
+### 视图
+
+- 视图的作用是渲染模型数据，将模型里的数据以某种形式呈现给客户。 
+
+- 为了实现视图模型和具体实现技术的解耦，Spring 在 org.springframework.web.servlet 包中定义了一个高度抽象的 View 接口：
+
+  ![](images/snipaste20200619_142218.png)
+
+- 视图对象由视图解析器负责实例化。由于视图是**无状态**的，所以他们不会有线程安全的问题
+
+#### 常用的视图接口实现类	![](images/snipaste20200619_142306.png)
+
+**使用 JstlView**，在SpringMVC中只需要在工程中导入 JST L相关 Jar 包即可使用JSTL视图。
+
+![](images/snipaste20200619_142937.png)
+
+### 使用国际化
+
+1、配置国际化资源文件
+
+![](images/snipaste20200619_144011.png)
+
+2、在 SpringMVC 中配置 ResourceBundleMessageSource 对应的Bean
+
+```java
+<!--
+    如果使用国际化，需要配置国际化资源文件的Bean
+-->
+<bean id="messageSource" class="org.springframework.context.support.ResourceBundleMessageSource">
+    <property name="basename" value="i8n"></property>
+</bean>
+```
+
+3、在页面中就可以使用国际化标签了<fmt:message>
+
+```html
+<fmt:message key="i18n.password"></fmt:message>
+<br>
+<fmt:message key="i18n.username"></fmt:message>
+```
+
+**注意：在使用属性文件之前一定要确认properties文件的编码集是否为UTF-8，**设置如下
+
+![](images/snipaste20200619_143228.png)
+
+### 视图解析器
+
+- SpringMVC 为逻辑视图名的解析提供了不同的策略，可以在 Spring WEB 上下文中配置一种或多种解析策略，并指定他们之间的先后顺序。
+- 每一种映射策略对应一个具体 的视图解析器实现类。 视图解析器的作用比较单一：将逻辑视图解析为一个具体的视图对象。 
+- 所有的视图解析器都必须实现 ViewResolver 接口
+
+![](images/snipaste20200619_144716.png)
+
+
+
+#### 使用BeanNameViewResolver
+
+1、在SpringMVC的核心配置文件中加入 BeanNameViewResolver的配置,并指定优先级。
+
+```Xml
+    <!--
+        配置 BeanNameViewResolver 通过Bean名称解析视图
+    -->
+    <bean class="org.springframework.web.servlet.view.BeanNameViewResolver">
+        <!--
+            通过order属性指定视图解析器的优先级
+                值越小，优先级越高
+        -->
+        <property name="order" value="200"></property>
+    </bean>
+```
+
+2、自定义一个类，实现 View 接口或View接口的抽象类。
+
+```Java
+@Component
+public class MyView implements View {
+    /*
+    视图返回的类型
+     */
+    @Override
+    public String getContentType() {
+        return "html/text";
+    }
+    /*
+    渲染视图的方法
+     */
+    @Override
+    public void render(Map<String, ?> map, HttpServletRequest httpServletRequest, HttpServletResponse httpServletResponse) throws Exception {
+        httpServletResponse.getWriter().write("This My View~~~~~~");
+    }
+}
+```
+
+3、在受理请求方法返回的虚拟视图名设置为自定义视图的名称
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
