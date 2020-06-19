@@ -569,7 +569,7 @@ private WebDataBinder resolveModelAttribute(String attrName, MethodParameter met
 
 - 视图对象由视图解析器负责实例化。由于视图是**无状态**的，所以他们不会有线程安全的问题
 
-#### 常用的视图接口实现类	![](images/snipaste20200619_142306.png)
+  #### 常用的视图接口实现类![](images/snipaste20200619_142306.png)
 
 **使用 JstlView**，在SpringMVC中只需要在工程中导入 JST L相关 Jar 包即可使用JSTL视图。
 
@@ -655,13 +655,124 @@ public class MyView implements View {
 
 3、在受理请求方法返回的虚拟视图名设置为自定义视图的名称
 
+### 视图映射
+
+如果希望将一个请求直接转发到WEB-INF目录下的资源，可以使用 <mvc:view-controller> 配置
+
+```XML
+<!--配置视图映射-->
+<mvc:view-controller path="/toInput" view-name="input"></mvc:view-controller>
+
+<!--
+    一般在开发过程中会配置一个标配 
+-->
+<mvc:annotation-driven></mvc:annotation-driven>
+```
+
+### 重定向
+
+在返回的虚拟视图前使用 redirect: 开头即可将请求重定向。
+
+源码：
+
+```java
+protected View createView(String viewName, Locale locale) throws Exception {
+  if (!this.canHandle(viewName, locale)) {
+    return null;
+  } else {
+    String forwardUrl;
+    // 判断返回的虚拟视图是否以 redirect: 开头
+    if (viewName.startsWith("redirect:")) {
+      forwardUrl = viewName.substring("redirect:".length());
+      RedirectView view = new RedirectView(forwardUrl, this.isRedirectContextRelative(), this.isRedirectHttp10Compatible());
+      view.setHosts(this.getRedirectHosts());
+      return this.applyLifecycleMethods(viewName, view);
+      // 判断返回的虚拟视图是否以 forward: 开头
+    } else if (viewName.startsWith("forward:")) {
+      forwardUrl = viewName.substring("forward:".length());
+      return new InternalResourceView(forwardUrl);
+    } else {
+      return super.createView(viewName, locale);
+    }
+  }
+}
+```
+
+## SpringMVC的表单标签
+
+>  通过 SpringMVC 的表单标签可以实现将模型数据中的属性和 HTML 表单元素相绑定，以实现表单数据更**便捷编辑**和**表单值的回显**
 
 
 
+```html
+<h4>Input Page</h4>
+    <%--
+        SpringMVC的表单标签默认所有的表单都需要回显。如果没有回显，就会报错
 
+        SpringMVC 提供的表单标签有:
+            form:from 标签： 是用来构建一个 form 表单的
+                属性：
+                    action: 表单提交的路径
+                    method: 表单提交的方式
+                    modelAttribute: 指定将模型数据中的数据在表单中进行回显
+            form:input 标签： 相当于 input 标签
+                属性：
+                    path: 指定模型数据中的属性名, 相当于 input 标签中的name属性
+            form:select 标签： 用于构建下拉列表
+                属性：
+                    items: 表示遍历的对象集合
+                    itemLabel： 使用对象中的那个字段显示
+                    itemValue： 使用对象中的那个字段进行提交作为值
+                    path： 相当于name属性
+           form:radiobuttons 标签： 用于构建一组单选按钮
+                    如果想items属性中放入一个Map 将会以 map中属性的键作为单选按钮的value
+                    以键的值作为显示的名称
 
+    --%>
+    <form:form action="/testCommit" method="post" modelAttribute="user">
+        Name: <form:input path="name" />
+        <br>
+        Email: <form:input path="email" />
+        <br>
+        age: <form:input path="age" />
+        <br>
+        <%
+            HashMap map = new HashMap();
+            map.put(0,"Female");
+            map.put(1,"Male");
 
+            ArrayList list = new ArrayList();
+            list.add("Female");
+            list.add("male");
+            request.setAttribute("gender",list);
+        %>
+        Gender: <form:radiobuttons path="gender" items="${gender}" delimiter="<br>"></form:radiobuttons>
+        <br>
+        <form:select path="department.id" items="${depts}" itemLabel="departmentName" itemValue="id" ></form:select>
+        <input type="submit" value="提交" />
+    </form:form>
+```
 
+### 处理静态资源
+
+优雅的Restful风格的请求是不希望请求后跟.form、.do、.action。所以 SpringMVC 会配置拦截所有请求。静态资源路径也会被SpringMVC拦截处理。发现没有对应的映射就会报404找不到页面。
+
+**解决办法：**
+
+在SpringMVC的核心配置文件中配置一个<mvc:default-servlet-handler> 节点即可解决。
+
+注意： 添加了该节点之后，必须保证配置了 <mvc:annotation-driven>
+
+```XML
+<!--
+        处理静态资源的配置
+    -->
+<mvc:default-servlet-handler></mvc:default-servlet-handler>
+<!--
+        一般在开发过程中会配置一个标配
+    -->
+<mvc:annotation-driven></mvc:annotation-driven>
+```
 
 
 
