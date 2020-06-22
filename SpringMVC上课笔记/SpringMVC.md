@@ -1043,7 +1043,145 @@ public String save(@Valid Employee employee, BindingResult bindingResult,Map map
 
 ### 错误消息国际化
 
+1、在SpringMVC的配置文件中 配置 ResourceBundlerMessageSource 对应的Bean
+
+```xml
+<!--
+        配置国际化消息
+     -->
+<bean id="messageSource" class="org.springframework.context.support.ResourceBundleMessageSource">
+  <property name="basename" value="i18n"></property>
+</bean>
+```
+
+2、编写国际化资源文件
+
+例如：
+
+```properties
+Email.employee.email=邮箱地址不正确
+Past.employee.birth=生日不合理，必须是一个过去的时间
+
+typeMismatch.employee.birth=生日的格式不正确，请以yyyy-MM-dd的形式输入
+typeMismatch.employee.salary=工资输入不正确，可能包含特殊字符
+```
+
+如何确定国际化资源文件中属性名：
+
+属性名以校验注解类名为前缀，结合 modleAttribute、属性名及属性类型名生成多个对应的消 息代码：例如 User 类中的 password 属性标准了一个 @Pattern 注 解，当该属性值不满足 @Pattern 所定义的规则时, 就会产生以下 4 个错误代码： 
+
+- **Pattern.user.password**
+- Pattern.password
+- Pattern.java.lang.String
+- Pattern
+
+若数据**类型转换**或**数据格式转换**时发生错误，或该有的**参数不存在**，或**调用处理方法**时发生错误，都会在隐含模型 中创建错误消息，其错误代码前缀说明如下： 
+
+- required：必要的参数不存在。如 @RequiredParam(“param1”) 标注了一个入参，但是该参数不存在 
+- **typeMismatch**：在数据绑定时，发生数据类型不匹配的问题
+- methodInvocation：Spring MVC 在调用处理方法时发生了错误
+
+### 使用JSON
+
+1、导入jackson相关jar包
+
+![](images/snipaste20200622_160809.png)
+
+2、发送一个ajax请求
+
+```js
+$("#testJson").click(function(){
+  //alert(123);
+  // 发送一个 ajax 请求
+  $.ajax({
+    url     :   this.href,
+    type    :   "post",
+    success :   function(result){
+      for(var i = 0; i < result.length; i++){
+        alert(result[i].lastName)
+      }
+    }
+  });
+  return false;
+});
+```
+
+3、在受理请求方法上标注一个 @ResponseBody 注解，Ajax的返回值即方法的返回值。
+
+```Java
+// 返回json
+@ResponseBody
+@RequestMapping("/testJson")
+public Collection<Employee> testJson(){
+  return employeeDao.getAll();
+}
+```
+
+#### 原理
+
+HttpMessageConverter<T> 负责**将请求信息转换为一个对象（类型为 T），将对象（ 类型为 T）输出为响应信息** 
+
+![](images/snipaste20200622_161347.png)
 
 
 
+
+
+![](images/snipaste20200622_161729.png)
+
+
+
+#### HttpMessageConverter<T>
+
+使用 HttpMessageConverter<T> 将请求信息转化并绑定到处理方法的入参中或将响应结果转为对应类型的响应信息，Spring 提供了两种途径： 
+
+- 使用 @RequestBody / @ResponseBody 对处理方法进行标注
+- 使用 HttpEntity<T> / ResponseEntity<T> 作为处理方法的入参或返回值
+
+##### @RequestBody / @ResponseBody 
+
+```java
+/*
+    HttpMessageConverter 使用之一：
+        @RequestBody
+        @ResponseBody
+      注意：这两个注解并不需要一起出现
+     */
+@ResponseBody
+@RequestMapping("/testHttpMessageConverter")
+public String testHttpMessageConverter(@RequestBody String body){
+  System.out.println(body);
+  return "hello " + new Date();
+}
+```
+
+#####  HttpEntity<T> / ResponseEntity<T>
+
+```Java
+/*
+    HttpMessageConverter 使用之二：
+        使用 HttpEntity<T> / ResponseEntity<T> 作为方法的入参 或 返回值
+
+        实现一个下载的效果。
+     */
+@RequestMapping("/testResponseEntity")
+public ResponseEntity<byte[]> testResponseEntity(HttpServletRequest request) throws IOException {
+  // 获取SerletContext对象
+  ServletContext context = request.getServletContext();
+  // 通过SerlvetContext对象获取文件的输入流
+  InputStream is = context.getResourceAsStream("/file/test.txt");
+  // 创建一个byte类型的数组
+  byte[] bytes = new byte[is.available()];
+  // 将文件读入到byte类型的数组中
+  is.read(bytes);
+
+  // 设置响应头
+  HttpHeaders headers = new HttpHeaders();
+  // 文件下载的响应头
+  headers.add("Content-Disposition","attachment;filename=abc.txt");
+  // 创建ResponseEntity对象，需要由以上三个参数确定
+  ResponseEntity<byte[]> responseEntity = new ResponseEntity<>(bytes, headers, HttpStatus.OK);
+  return responseEntity;
+}
+```
 
