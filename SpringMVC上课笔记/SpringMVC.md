@@ -774,45 +774,274 @@ protected View createView(String viewName, Locale locale) throws Exception {
 <mvc:annotation-driven></mvc:annotation-driven>
 ```
 
+## 数据的绑定
+
+通过超链接或表单提交到Controller层的请求数据，如何绑定给方法的入参的。
+
+- 数据类型的转化 （提交的数据往往都是字符串）
+- 数据的格式化
+- 数据的校验
+
+### 数据绑定的流程
+
+- Spring MVC 主框架将 ServletRequest  对象及目标方法的入参实例传递给 WebDataBinderFactory 实例，以创建 DataBinder 实例对象 
+
+- DataBinder 调用装配在 Spring MVC 上下文中的 ConversionService 组件进行数据类型转换、数据格式化工作。将 Servlet 中的请求信息填充到入参对象中 
+
+- 调用 Validator 组件对已经绑定了请求消息的入参对象进行数据合法性校验，并最终生成数据绑定结果 BindingData 对象 
+
+- Spring MVC 抽取 BindingResult 中的入参对象和校验错误对象，将它们赋给处理方法的响应入参
+
+  源码：
+
+```Java
+Object attribute = mavContainer.containsAttribute(name) ? mavContainer.getModel().get(name) : this.createAttribute(name, parameter, binderFactory, webRequest);
+// 根据request对象和目标方法入参实例创建 WebDataBinder 对象
+WebDataBinder binder = binderFactory.createBinder(webRequest, attribute, name);
+if (binder.getTarget() != null) {
+  if (!mavContainer.isBindingDisabled(name)) {
+    // 进行数据绑定
+    this.bindRequestParameters(binder, webRequest);
+  }
+  // 进行数据的校验
+  this.validateIfApplicable(binder, parameter);
+  if (binder.getBindingResult().hasErrors() && this.isBindExceptionRequired(binder, parameter)) {
+    throw new BindException(binder.getBindingResult());
+  }
+}
+```
+
+ConversionService  中转换器的内容
+
+![](images/snipaste20200622_095643.png)
+
+### 数据绑定流程示意图
+
+Spring MVC 通过反射机制对目标处理方法进行解析，将请求消息绑定到处理方法的入参中。数据绑定的核心部件是 DataBinder，运行机制如下：
+
+![](images/snipaste20200622_100531.png)
+
+Binder 对象中的内容:
+
+![](images/snipaste20200622_100828.png)
+
+### 自定义类型转换器(了解)
+
+- ConversionService 是 Spring 类型转换体系的核心接口。
+- 可以利用 ConversionServiceFactoryBean 在 Spring 的 IOC 容器中定义一个 ConversionService. Spring 将自动识别出 IOC 容器中的 ConversionService，并在 Bean 属性配置及 Spring  MVC 处理方法入参绑定等场合使用它进行数据的转换 
+- 可通过 ConversionServiceFactoryBean 的 converters 属性注册自定义的类型转换器
+
+#### Spring 支持的转换器
+
+Spring 定义了 3 种类型的转换器接口，实现任意一个转换•器接口都可以作为自定义转换器注册到 ConversionServiceFactroyBean 中： 
+
+- **Converter<S,T>**：将 S 类型对象转为 T 类型对象
+- ConverterFactory：将相同系列多个 “同质” Converter 封装在一 起。如果希望将一种类型的对象转换为另一种类型及其子类的对 象（例如将 String 转换为 Number 及 Number 子类 （Integer、Long、Double 等）对象）可使用该转换器工厂类 
+- GenericConverter：会根据源类对象及目标类对象所在的宿主类– 中的上下文信息进行类型转换
+
+自定义类型转换器步骤：
+
+1、创建一个类实现Converter<S,T>接口，实现converter方法。
+
+```java
+@Component
+public class StringToEmployeeConvertor implements Converter<String,Employee> {
+    @Override
+    public Employee convert(String s) {
+        // 编写转换的逻辑  FF-ff@aliyun.com-0-1004
+        if(s != null && !"".equals(s)){
+            String[] strs = s.split("-");
+            Employee employee = new Employee(null, strs[0], strs[1], Integer.parseInt(strs[2]), new Department(Integer.parseInt(strs[3]), null));
+            return employee;
+        }
+        return null;
+    }
+}
+```
+
+2、在 SpringMVC 的配置文件中配置好自定义类型转换器。
+
+```xml
+<!-- 2、 将自定义的类型转换器注册到 ConversionServiceFactoryBean 中-->
+<bean id="conversionService" class="org.springframework.context.support.ConversionServiceFactoryBean">
+  <property name="converters">
+    <ref bean="stringToEmployeeConvertor"></ref>
+  </property>
+</bean>
+```
+
+3、将配置好的 ConverterService 配置到mvc:annotaionDirver 的converter-service 属性中
+
+```Xml
+<!--3、需要将配置好的ConversionService配置到annotation-driven节点的conversion-service属性中-->
+<mvc:annotation-driven conversion-service="conversionService"/>
+```
 
 
 
+## mvc:annotation-driven
+
+<mvc:annotation-driven /> 会自动注册
+
+- RequestMappingHandlerMapping
+- **RequestMappingHandlerAdapter** 
+- ExceptionHandlerExceptionResolver  三个bean。 
+
+还将提供以下支持：
+
+- 支持使用 **ConversionService** 实例对表单参数进行类型转换
+- 支持使用 @NumberFormat annotation、@DateTimeFormat 
+- 注解完成数据类型的格式化 支持使用 @Valid 注解对 JavaBean 实例进行 JSR 303 验证– 支持使用 @RequestBody 和 @ResponseBody 注解
+
+注意：必须在项目中加入这个配置，开发时的一个标准配置
 
 
 
+### @InitBinder 注解
+
+```java
+    /*
+    因为数据的绑定，数据的校验及格式化都是通过webDataBinder对象进行控制的。
+    而 @InitBinder 注解修饰方法可以用于控制 webDataBinder 的工作流程
+       比如： 控制那些参数不被绑定到方法的入参
+     */
+//    @InitBinder
+//    public void testInitBinder(WebDataBinder webDataBinder){
+//        // 表示不去绑定lastName属性
+//        webDataBinder.setDisallowedFields("lastName");
+//    }
+```
 
 
 
+### 数据的格式化
 
+SpringMVC 上下文中注册的 ConversionService 的类型可以是 DefaulteFormattingConversionService 类型。次类型的转换器支持数据的转换及数据的格式化。
 
+FormattingConversionServiceFactroyBean 内部已经注册了 :
 
+- NumberFormatAnnotationFormatterFactroy：支持对数字类型的属性– 使用 **@NumberForma**t 注解
+- JodaDateTimeFormatAnnotationFormatterFactroy：支持对日期类型– 的属性使用 **@DateTimeFormat** 注解 
 
+@NumberFomat 和 @DateTimeFormat 只需要标注在需要转换对象的属性上即可。
 
+使用方法
 
+![](images/snipaste20200622_115103.png)
 
+![](images/snipaste20200622_115131.png)
 
+### 数据的校验
 
+SpringMVC 支持JSR303 标准校验框架， 他在自己本身校验框架的基础上实现了 JSR303 的标准。
 
+JSR 303 通过在 Bean 属性上标注类似于 @NotNull、@Max 等标准的注解指定校验规则，并通过标准的验证接口对 Bean 进行验证
 
+![](images/snipaste20200622_145104.png)
 
+**HibernateValidata **
 
+**Hibernate Validator** 是 JSR 303 的一个参考实现，除支持• 所有标准的校验注解外，它还支持以下的扩展注解
 
+![](images/snipaste20200622_145201.png)
 
+#### 校验使用的步骤
 
+1、 导入JSR303 标准框架实现框架Jar包
 
+![](images/snipaste20200622_145330.png)
 
+2、在需要校验的实体类属性上标注对应对的注解
 
+```java
+public class Employee {
+	private Integer id;
+	@NotEmpty // 校验是否为空串或null      NotNull
+	private String lastName;
+	@Email
+	private String email;
+	//1 male, 0 female
+	private Integer gender;
+	private Department department;
+	@Past // 校验是否是一个过去的时间
+	@DateTimeFormat(pattern = "yyyy-MM-dd")
+	private Date birth;
+	@Range(min = 3000, max = 50000) // 校验数值是否在指定范围内
+	@NumberFormat(pattern = "##,###")
+	private Float salary;
+```
 
+3、在目标受理请求方法的入参实例POJO前加上@Valid 注解
 
+校验即可使用。
 
+#### 如何获取错误消息
 
+在目标受理请求方法对应入参之后加入 BindingResult 类型的参数。即可通过这个对象获取数据校验或类型转换的错误结果。如果出现错误可以直接将页面转发至提交页面，在提交页面可以通过<form:errors> 获取错误消息。
 
+```java
+/*
+    获取校验结果：
+        在需要校验的入参后加入一个BindingResult或Error类型的参数，获取校验结果。
+        注意： 该参数必须和校验对象挨着。
+     */
+@RequestMapping(value = "/emp", method = RequestMethod.POST)
+public String save(@Valid Employee employee, BindingResult bindingResult,Map map) throws ServletException, IOException {
 
+  /*
+         BindingResult 对象的方法：
+            hasErrors() 是否校验或转换出错
+         */
+  if(bindingResult.hasErrors()){
+    List<FieldError> fieldErrors = bindingResult.getFieldErrors();
+    for(FieldError error : fieldErrors){
+      System.out.println("Employee的<"+error.getField()+">属性出现错误。" +
+                         "错误消息为："+ error.getDefaultMessage());
+    }
+    // 获取所有的部门信息，存入模型中
+    map.put("depts",departmentDao.getDepartments());
+    //request.getRequestDispatcher("/WEB-INF/pages/input.jsp").forward(request,response);
+    return "input";
+  }
+```
 
+```Html
+<form:form action="/emp" method="post" modelAttribute="employee">
 
+  <%--<form:errors path="*"></form:errors>--%>
 
+<%--如果是修改 1、保存员工的id  2、需要发送PUT请求--%>
+  <c:if test="${!empty employee.id}">
+    <form:hidden path="id" />
+    <input type="hidden" name="_method" value="PUT" />
+  </c:if>
+  <c:if test="${empty employee.id}">
+    LastName: <form:input path="lastName" /> <form:errors path="lastName"></form:errors>
+  </c:if>
+  <br>
+  Email: <form:input path="email" /><form:errors path="email"></form:errors>
+  <br>
+  <%
+     HashMap map = new HashMap();
+     map.put(0,"Female");
+     map.put(1,"Male");
+     pageContext.setAttribute("map",map);
+     %>
+    Gender: <form:radiobuttons path="gender" items="${map}"></form:radiobuttons>
+    <br>
+    Department: <form:select path="department.id" items="${depts}"
+                             itemValue="id" itemLabel="departmentName"></form:select>
+    <br>
+    Birth: <form:input path="birth"></form:input> <form:errors path="birth"></form:errors>
+    <br>
+    <%-- 10,000 --%>
+      Salary: <form:input path="salary" /> <form:errors path="salary"></form:errors>
+      <br>
+      <input type="submit" value="Submit">
+      </form:form>
+```
 
-
+### 错误消息国际化
 
 
 
