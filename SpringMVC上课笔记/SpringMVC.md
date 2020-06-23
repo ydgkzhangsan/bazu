@@ -1185,3 +1185,175 @@ public ResponseEntity<byte[]> testResponseEntity(HttpServletRequest request) thr
 }
 ```
 
+## 国际化
+
+- 1、在页面中根据浏览器的语言设置情况，将文本（不是内容）、数值、时间根据语言情况进行显示。
+
+    a. 在SpringMVC的核心配置文件中配置国际化资源文件对应的bean  ResourceBundlerMessageSource
+
+  ```xml
+  <!--配置国际化资源文件对应的bean-->
+  <bean id="messageSource" class="org.springframework.context.support.ResourceBundleMessageSource">
+    <property name="basename" value="i18n"></property>
+  </bean>
+  ```
+
+    b. 配置国际化资源文件 .properties文件
+
+  ​	新建properties文件
+
+  ![](images/snipaste20200623_140338.png)
+
+    ![snipaste20200623_140530.png](images/snipaste20200623_140530.png)
+
+  ![images/snipaste20200623_140630.png](images/snipaste20200623_140630.png)
+
+  c.  使用 fmg:massage 获取国际化资源文件中的内容，并在页面中显示
+
+  ```html
+  <h4><fmt:message key="i18n.title"></fmt:message> </h4>
+  ```
+
+2、在控制器中获取国际化消息内容。
+  在控制器中注入 ResouceBundlerMessageSource 对应的bean 通过其getMessage() 获取传入消息码对应的消息。
+
+```java
+@Controller
+public class DispatcherController {
+    @Autowired
+    private ResourceBundleMessageSource messageSource;
+    @RequestMapping("/test")
+    public String test(Locale locale){
+        String message = messageSource.getMessage("i18n.title", null, locale);
+        System.out.println("message = " + message);
+        return "success";
+    }
+}
+```
+
+3、通过超链接去切换
+  a.编写超链接 需要在超链接后携带一个请求参数 locale  参数值为语言信息  en_US   zh_CN
+
+ ```html
+<a href="/test?locale=zh_CN">中文</a>|<a href="/test?locale=en_US">English</a>
+ ```
+
+ b.在SpringMVC的配置文件中配置 SessionLocaleResorver 和 LocaleChangeInterceptor
+
+```xml
+<!--配置 SessionLocaleResolver-->
+<bean id="localeResolver" class="org.springframework.web.servlet.i18n.SessionLocaleResolver">
+</bean>
+
+<!--配置 LocaleChangeInterceptor-->
+<mvc:interceptors>
+  <bean class="org.springframework.web.servlet.i18n.LocaleChangeInterceptor"></bean>
+</mvc:interceptors>
+```
+
+## 文件的上传
+
+- 导入jar包
+
+  ![images/snipaste20200623_143358.png](images/snipaste20200623_143358.png)
+
+- 配置 CommonsMultipartResovler 对应的bean
+
+  ```xml
+  <!--配置 CommonsMultipartResovler -->
+  <bean id="multipartResolver" class="org.springframework.web.multipart.commons.CommonsMultipartResolver">
+    <!--配置文件上传的字符集-->
+    <property name="defaultEncoding" value="UTF-8" />
+    <!--配置文件上传的最大大小-->
+    <property name="maxUploadSize" value="#{5 * 1024 * 1024}" />
+  </bean>
+  ```
+
+- 在上传受理方法的入参中通过 MultipartFile对象获取文件内容
+
+  ```Java
+  @ResponseBody
+  @RequestMapping("/testCommonsMultipartResovler")
+  public String testCommonsMultipartResovler(MultipartFile file,String desc) throws IOException {
+    System.out.println(file);
+    System.out.println(desc);
+    String originalFilename = file.getOriginalFilename();// 获取文件的原始文件名
+    System.out.println("originalFilename = " + originalFilename);
+    long size = file.getSize();// 获取文件的大小
+    System.out.println("size = " + size);
+    String name = file.getName();// 表单的names属性
+    System.out.println("name = " + name);
+    String contentType = file.getContentType(); // 获取内容类型
+    System.out.println("contentType = " + contentType);
+    InputStream inputStream = file.getInputStream(); // 获取文件对应的输入流
+    System.out.println("inputStream = " + inputStream);
+    return "Load Success";
+  }
+  ```
+
+  ​
+
+## 拦截器
+
+Spring MVC 也可以使用拦截器对**请求进行拦截处理**，用户可以自定义拦截器来实现特定的功能，自定义的拦截器必须实现 **HandlerInterceptor** 接口 
+
+### 自定义拦截器的步骤
+
+1、定义一个类实现 HandlerInterceptor 接口，并实现其中的方法
+
+```java
+@Component
+public class MyFirstInterceptor implements HandlerInterceptor {
+```
+
+2、需要配置拦截器
+
+```Xml
+<!--配置 LocaleChangeInterceptor-->
+<mvc:interceptors>
+  <!--配置第一个拦截器-->
+  <!--<bean class="com.ydgk.springmvc.interceptors.MyFirstInterceptor"></bean>-->
+  <ref bean="myFirstInterceptor"/>
+</mvc:interceptors>
+```
+
+### 拦截器中每个方法执行时机及作用
+
+```Java
+/*
+    preHandler方法执行的时机：
+        在目标受理请求方法执行之前被调用。
+
+        关于返回值：
+            如果不希望preHandler方法执行之后再执行其他拦截器或目标方法，则可以直接返回false
+            如果希望 preHandler 方法执行之后，继续执行拦截器或目标方法，则返回true
+
+      作用： 权限、登录、数据源的获取
+     */
+@Override
+public boolean preHandle(HttpServletRequest httpServletRequest, HttpServletResponse httpServletResponse, Object o) throws Exception {
+  System.out.println("MyFirstInterceptor.preHandle");
+  return true;
+}
+
+/*
+    执行时机： postHandler方法时在目标受理请求方法执行之后，渲染视图之前执行的。
+
+        可以修改目标受理请求方法返回的视图
+     */
+@Override
+public void postHandle(HttpServletRequest httpServletRequest, HttpServletResponse httpServletResponse, Object o, ModelAndView modelAndView) throws Exception {
+  System.out.println("MyFirstInterceptor.postHandle");
+}
+
+/*
+        执行时机： afterCompletion 方法是在渲染视图完成之后执行。
+
+        作用： 可以用来关闭资源，回收资源
+     */
+@Override
+public void afterCompletion(HttpServletRequest httpServletRequest, HttpServletResponse httpServletResponse, Object o, Exception e) throws Exception {
+  System.out.println("MyFirstInterceptor.afterCompletion");
+}
+```
+
