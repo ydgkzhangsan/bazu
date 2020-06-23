@@ -1325,7 +1325,7 @@ public class MyFirstInterceptor implements HandlerInterceptor {
         在目标受理请求方法执行之前被调用。
 
         关于返回值：
-            如果不希望preHandler方法执行之后再执行其他拦截器或目标方法，则可以直接返回false
+            如果不希望 preHandler 方法执行之后再执行其他拦截器或目标方法，则可以直接返回false
             如果希望 preHandler 方法执行之后，继续执行拦截器或目标方法，则返回true
 
       作用： 权限、登录、数据源的获取
@@ -1355,5 +1355,219 @@ public void postHandle(HttpServletRequest httpServletRequest, HttpServletRespons
 public void afterCompletion(HttpServletRequest httpServletRequest, HttpServletResponse httpServletResponse, Object o, Exception e) throws Exception {
   System.out.println("MyFirstInterceptor.afterCompletion");
 }
+```
+
+### 拦截器执行的顺序
+
+单个拦截器
+
+![images/snipaste20200623_155946.png](images/snipaste20200623_155946.png)
+
+两个或多个连接器执行顺序：
+
+拦截器的 preHandler 方法会按照拦截器配置的顺序依次执行。其他的两个方法（postHandler,afterComletion）会按配置的反序执行。
+
+![images/snipaste20200623_160004.png](images/snipaste20200623_160004.png)
+
+如果第二个及以后的拦截器的preHandler方法返回的是一个false，那么连接器会执行前面拦截器的preHandler方法返回不是 false 的 afterComletionf 方法
+
+![images/snipaste20200623_160033.png](images/snipaste20200623_160033.png)
+
+### 拦截器的配置
+
+```xml
+<!--配置 LocaleChangeInterceptor-->
+<mvc:interceptors>
+  <!--配置第一个拦截器-->
+  <!--<bean class="com.ydgk.springmvc.interceptors.MyFirstInterceptor"></bean>-->
+  <ref bean="myFirstInterceptor"/>
+  <!--配置第二个拦截器-->
+  <!--<ref bean="mySecondInterceptor" />-->
+
+  <!--
+         可以使用mvc:interceptor子节点更加细粒度的配置拦截器。
+         -->
+  <mvc:interceptor>
+    <!--
+            指定哪些请求交个拦截器进行拦截
+                可以使用通配符
+                    * 表示任意多个字符的一层路径  /*.js
+
+                /** 表示匹配任意多层路径
+            -->
+    <mvc:mapping path="/**"/>
+    <!-- 表示指定哪些路径不被拦截 -->
+    <mvc:exclude-mapping path="/test" />
+    <mvc:exclude-mapping path="/abc" />
+    <!--指定拦截器-->
+    <ref bean="mySecondInterceptor" />
+  </mvc:interceptor>
+  <bean class="org.springframework.web.servlet.i18n.LocaleChangeInterceptor"></bean>
+</mvc:interceptors>
+```
+
+## 异常处理
+
+SpringMVC在配置了mvc:annotation 之后会在SpringMVC 上下文中自动配置好三个  HandlerExceptionResolver 的实现类。
+
+![images/snipaste20200623_162028.png](images/snipaste20200623_162028.png)
+
+以下是SpringMVC提供好的 HandlerExceptionResolver  的实现类
+
+![images/snipaste20200623_161526.png](images/snipaste20200623_161526.png)
+
+### ExceptionHandlerExceptionResolver(重点)
+
+- 主要处理 Handler 中用 @ExceptionHandler 注解定义的方法。 
+
+  ```JAVA
+  /*
+      如果受理请求的方法出现了 @ExceptionHandler 注解value值指定的异常或其异常的子类时，会交接这个方法处理
+      如果想要在受理请求的方法中获取异常对象，可以在方法的入参中声明一个异常参数
+      @ExceptionHandler 修饰的方法可以是多个。如果一个Handler中有多个被@ExceptionHandler修饰的方法会
+      使用出现异常匹配较为精确的那个处理异常方法进行异常处理
+
+      如何将异常对象传入到错误页面中? 异常处理的方法不能加入 Map 作为入参。
+      使用ModelAndView作为方法的返回值
+       */
+  @ExceptionHandler(ArithmeticException.class)
+  public ModelAndView exceptionHandlerMethod(Exception exception){
+    System.out.println(exception.getMessage());
+    ModelAndView error = new ModelAndView("error");
+    error.addObject("exception",exception);
+    return error;
+  }
+  ```
+
+- @ExceptionHandler 注解定义的方法优先级问题：例如发生的是NullPointerException，但是声明的异常有 RuntimeException 和 Exception，此候会根据异常的最近继承关系找到继承深度最浅的那个 @ExceptionHandler 注解方法，即标记了 RuntimeException 的方法 
+
+  ​
+
+- ExceptionHandlerMethodResolver 内部若找不到@ExceptionHandler 注解的话，会找 @ControllerAdvice 中的 @ExceptionHandler  注解方法
+
+  ```java
+  /*
+  想要定义一个类是异常处理类，需要使用@ControllerAdvice注解修饰这个类，
+  被这个注解修饰的类会被SpringMVC扫描到。
+   */
+  @ControllerAdvice
+  public class MyExceptionHandlerClass {
+
+      @ExceptionHandler(ArithmeticException.class)
+      public ModelAndView exceptionHandlerMethod(Exception exception){
+          System.out.println(exception.getMessage());
+          ModelAndView error = new ModelAndView("error");
+          error.addObject("exception",exception);
+          return error;
+      }
+
+  }
+  ```
+
+  ### ResponseStatusExceptionResolver（了解）
+
+  根据响应状态去进行异常解析。
+
+  如果程序抛出了一个被@ResponceStatus注解修饰的异常时，会使用 ResponseStatusExceptionResolver 进行异常解析。
+
+  ```java
+  @ResponseStatus(value = HttpStatus.BAD_REQUEST,reason = "就是不知道为什么想抛出一个异常")
+  public class MyException extends RuntimeException {
+
+      static final long serialVersionUID = -70348912347190745L;
+  }
+  ```
+
+  ![images/snipaste20200623_165144.png](images/snipaste20200623_165144.png)
+
+### DefaultHandlerExceptionResolve(了解)
+
+SpringMVC  默认对一些异常进行解析的：
+
+```java
+if (ex instanceof NoSuchRequestHandlingMethodException) {
+                return this.handleNoSuchRequestHandlingMethod((NoSuchRequestHandlingMethodException)ex, request, response, handler);
+            }
+
+            if (ex instanceof HttpRequestMethodNotSupportedException) {
+                return this.handleHttpRequestMethodNotSupported((HttpRequestMethodNotSupportedException)ex, request, response, handler);
+            }
+
+            if (ex instanceof HttpMediaTypeNotSupportedException) {
+                return this.handleHttpMediaTypeNotSupported((HttpMediaTypeNotSupportedException)ex, request, response, handler);
+            }
+
+            if (ex instanceof HttpMediaTypeNotAcceptableException) {
+                return this.handleHttpMediaTypeNotAcceptable((HttpMediaTypeNotAcceptableException)ex, request, response, handler);
+            }
+
+            if (ex instanceof MissingPathVariableException) {
+                return this.handleMissingPathVariable((MissingPathVariableException)ex, request, response, handler);
+            }
+
+            if (ex instanceof MissingServletRequestParameterException) {
+                return this.handleMissingServletRequestParameter((MissingServletRequestParameterException)ex, request, response, handler);
+            }
+
+            if (ex instanceof ServletRequestBindingException) {
+                return this.handleServletRequestBindingException((ServletRequestBindingException)ex, request, response, handler);
+            }
+
+            if (ex instanceof ConversionNotSupportedException) {
+                return this.handleConversionNotSupported((ConversionNotSupportedException)ex, request, response, handler);
+            }
+
+            if (ex instanceof TypeMismatchException) {
+                return this.handleTypeMismatch((TypeMismatchException)ex, request, response, handler);
+            }
+
+            if (ex instanceof HttpMessageNotReadableException) {
+                return this.handleHttpMessageNotReadable((HttpMessageNotReadableException)ex, request, response, handler);
+            }
+
+            if (ex instanceof HttpMessageNotWritableException) {
+                return this.handleHttpMessageNotWritable((HttpMessageNotWritableException)ex, request, response, handler);
+            }
+
+            if (ex instanceof MethodArgumentNotValidException) {
+                return this.handleMethodArgumentNotValidException((MethodArgumentNotValidException)ex, request, response, handler);
+            }
+
+            if (ex instanceof MissingServletRequestPartException) {
+                return this.handleMissingServletRequestPartException((MissingServletRequestPartException)ex, request, response, handler);
+            }
+
+            if (ex instanceof BindException) {
+                return this.handleBindException((BindException)ex, request, response, handler);
+            }
+
+            if (ex instanceof NoHandlerFoundException) {
+                return this.handleNoHandlerFoundException((NoHandlerFoundException)ex, request, response, handler);
+            }
+
+            if (ex instanceof AsyncRequestTimeoutException) {
+                return this.handleAsyncRequestTimeoutException((AsyncRequestTimeoutException)ex, request, response, handler);
+            }
+```
+
+### SimpleMappingExceptionResolver
+
+对系统中出现的异常进行映射到对应的视图。
+
+在Spring核心配置文件中配置异常映射即可：
+
+```Xml
+<!--配置简单异常映射-->
+<bean id="exceptionResolver" class="org.springframework.web.servlet.handler.SimpleMappingExceptionResolver">
+  <property name="exceptionMappings">
+    <props>
+      <!--
+                key 异常的全类名
+                    节点的值即视图名
+                -->
+      <prop key="java.lang.NullPointerException">error</prop>
+    </props>
+  </property>
+</bean>
 ```
 
