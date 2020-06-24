@@ -1571,3 +1571,84 @@ if (ex instanceof NoSuchRequestHandlingMethodException) {
 </bean>
 ```
 
+
+
+## SpringMVC 运行流程
+
+原理图
+
+![images/snipaste20200624_101728.png](images/snipaste20200624_101728.png)
+
+ 浏览器发送一个请求，如果所被射到 SpringMVC 的 DispatcherServlet 处理.
+
+1、SpringMVC 会判断是否存在对应的映射（HandlerMapping）
+
+- 如果不存在并且配置了静态资源处理的 DefaultServlet , 那么会找到对应的静态资源。
+- 如果不存在并且没有配置静态资源处理的 DefaultServlet ， 那么会在控制台打印日志并返回404页面
+
+2、如果存在对应的映射（HandlerMapping）
+
+- 通过 HandlerMapping  获取 HandlerExecutionChain 对象
+  - HandlerMapping 中保存着请求uri和受理请求方法对应的映射关系
+  - HandlerExecutionChain  中保存着受理请求的方法及拦截器相关信息
+- 通过 HandlerExecutionChain 获取 HandlerAdapter 对象。
+  - 这一步实际上就是判断配置好的哪一个 HandlerAdapter 能适配目标受理请求的方法
+- 调用拦截器的preHandler方法
+- 调用目标受理请求的方法
+- 调用拦截器的postHandler方法
+- 判断受理请求的方法是否发生异常（前提使用HandlerExceptionResolver 进行了异常处理）
+  - 发生了异常，会使用异常处理返回的 ModeAndView 去替换 ModelAndView
+- 由 ViewResolver 解析视图得到 View (实际的视图对象)
+- 通过 View 对象去渲染视图
+- 调用拦截器的 AfterCompletion 方法
+
+## 字符乱码
+
+
+
+
+
+## SSM整合
+
+Spring+SpringMVC+Mybatis 三大框架的使用
+
+### Spring 整合 SpringMVC
+
+关于整合 Spring + SpringMVC
+
+>  有的人认为需要整合: 如果不需要整合，在使用时SpringMVC的IOC容器还需要作为Spring的IOC容器使用。可能会导致配置文件比较乱。认为Spring（数据源、事务。。。）主要是用来做整合的、而SpringMVC是用来做一些调度的。
+
+>  有的人认为不需要整合：认为SpringMVC是Spring的web模块。对于多个配置文件可以使用import节点将其整合在一起。
+
+**整合**
+
+Spring 整合 SpringMVC 的什么？
+
+是否需要加入 Spring 的 IOC 容器启动的 ContextLoadListener？
+
+**步骤：**
+
+导入相关jar包
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
